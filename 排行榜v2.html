@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>⚔️ 積分經驗值統計系統</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- JF Open 粉圓字體 -->
+    <link href="https://cdn.jsdelivr.net/npm/jf-openhuninn@1.0.0/dist/jf-openhuninn.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -13,7 +17,8 @@
         }
 
         body {
-            font-family: 'Microsoft JhengHei', 'Segoe UI', Tahoma, sans-serif;
+            font-family: 'jf-openhuninn', 'Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', Tahoma, sans-serif;
+            font-size: 14pt;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -717,10 +722,16 @@ function chip(txt) { return `<span class="xp-chip">${txt}</span>`; }
 // ── Personal view ──
 function renderPersonal({ persons }) {
     const rows = persons.map((p, i) => {
+        // 計算 BV 換算成 XP（每 100BV = 10XP）
+        const bvToXp = Math.floor(p.bv / 100) * 10;
+        
         const chips = Object.entries(p.breakdown)
             .filter(([,v]) => v.total > 0)
             .map(([label, v]) => chip(`${label} ${v.total}`))
             .join('');
+        
+        // 將 BV 換算的 XP 加入明細
+        const chipsWithBv = chips + (bvToXp > 0 ? chip(`💰零售 ${bvToXp}`) : '');
 
         return `<tr class="${i<3?'rank-'+(i+1):''}">
             ${rankCell(i)}
@@ -728,9 +739,12 @@ function renderPersonal({ persons }) {
                 <div class="player-name">${p.name}</div>
                 <div class="player-team">${p.team}</div>
             </td>
+            <td style="text-align: center; font-weight: 600; color: #e67e22;">
+                ${p.bv.toLocaleString()} BV
+            </td>
             <td>
                 <div class="xp-total">${p.xp.toLocaleString()} XP</div>
-                <div class="xp-breakdown">${chips}</div>
+                <div class="xp-breakdown">${chipsWithBv}</div>
             </td>
             <td>
                 ${badge(p.level)}
@@ -746,11 +760,12 @@ function renderPersonal({ persons }) {
                 <thead><tr>
                     <th style="width:55px">排名</th>
                     <th>姓名／戰隊</th>
+                    <th style="width:110px">累積 BV</th>
                     <th>經驗值 XP（各項明細）</th>
                     <th style="width:170px">等級</th>
                 </tr></thead>
                 <tbody>
-                    ${persons.length ? rows : '<tr><td colspan="4" class="no-data">此期間尚無資料</td></tr>'}
+                    ${persons.length ? rows : '<tr><td colspan="5" class="no-data">此期間尚無資料</td></tr>'}
                 </tbody>
             </table>
         </div>`;
@@ -760,11 +775,15 @@ function renderPersonal({ persons }) {
 function renderTeam({ teams }) {
     const rows = teams.map((t, i) => {
         const avg = t.activeCount ? Math.round(t.totalXP / t.activeCount) : 0;
+        const bvToXp = Math.floor(t.totalBV / 100) * 10;
         const chips = [
             t.xpBreakdown.retail   > 0 ? chip(`💰零售 ${t.xpBreakdown.retail}`) : '',
             t.xpBreakdown.activity > 0 ? chip(`🎯活動 ${t.xpBreakdown.activity}`) : '',
             t.xpBreakdown.recruit  > 0 ? chip(`👥招募 ${t.xpBreakdown.recruit}`) : '',
         ].join('');
+        
+        // 將 BV 換算的 XP 加入明細
+        const chipsWithBv = chips + (bvToXp > 0 ? chip(`💰零售 ${bvToXp}`) : '');
 
         return `<tr class="${i<3?'rank-'+(i+1):''}">
             ${rankCell(i)}
@@ -773,9 +792,12 @@ function renderTeam({ teams }) {
                 <div class="player-team">成員：${t.members.join('、')}</div>
             </td>
             <td>${t.activeCount} / ${t.members.length}</td>
+            <td style="text-align: center; font-weight: 600; color: #e67e22;">
+                ${t.totalBV.toLocaleString()} BV
+            </td>
             <td>
                 <div class="xp-total">${t.totalXP.toLocaleString()} XP</div>
-                <div class="xp-breakdown">${chips}</div>
+                <div class="xp-breakdown">${chipsWithBv}</div>
             </td>
             <td class="xp-total">${avg.toLocaleString()}</td>
         </tr>`;
@@ -789,11 +811,12 @@ function renderTeam({ teams }) {
                     <th style="width:55px">排名</th>
                     <th>戰隊名稱</th>
                     <th style="width:95px">參與人數</th>
+                    <th style="width:110px">總 BV</th>
                     <th>總積分 XP（各項明細）</th>
                     <th style="width:95px">平均 XP</th>
                 </tr></thead>
                 <tbody>
-                    ${teams.length ? rows : '<tr><td colspan="5" class="no-data">此期間尚無資料</td></tr>'}
+                    ${teams.length ? rows : '<tr><td colspan="6" class="no-data">此期間尚無資料</td></tr>'}
                 </tbody>
             </table>
         </div>`;
