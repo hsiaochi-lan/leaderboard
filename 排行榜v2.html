@@ -377,7 +377,7 @@ const TEAMS = {
     '慧芳組':       ['宥閑','慧芳','筱琦','茜阌','薳之'],
     '慧貞組':       ['慧貞','瑾誼','怡珊'],
     'Mary組':       ['Mary','Mui Hong','Nic','Allyson','Joe/惠云','Christine'],
-    'Christine組':  ['Christine','Utala'],
+    'Christine組':  ['ChristineF','Utala'],
     'Adrian組':     ['Adrian','Lynn春琳','慧儀','小芳','婉娟'],
     'James&Melody組':['J&M','Jovy'],
 };
@@ -613,7 +613,15 @@ function buildPeriod(rows) {
     // Build person list
     const persons = Object.entries(agg).map(([name, s]) => {
         const team = findTeam(name, s.team);
-        return { name, team, bv: s.bv, xp: s.totalXP, breakdown: s.breakdown, level: getLevel(s.totalXP) };
+        // 計算 BV 換算成 XP（每 100BV = 10XP）
+        const bvToXp = Math.floor(s.bv / 100) * 10;
+        // 將 BV 換算的 XP 加入 breakdown
+        if (bvToXp > 0) {
+            s.breakdown['💰零售'] = { count: Math.floor(s.bv / 100), multiplier: 10, total: bvToXp };
+        }
+        // 將 BV 換算的 XP 加入總 XP
+        const totalXp = s.totalXP + bvToXp;
+        return { name, team, bv: s.bv, xp: totalXp, breakdown: s.breakdown, level: getLevel(totalXp) };
     }).sort((a,b) => b.xp - a.xp);
 
     // Build team stats
@@ -627,7 +635,7 @@ function buildPeriod(rows) {
             const recruitXP = (p.breakdown['👥招募']?.total || 0) + (p.breakdown['🌟新夥伴招募']?.total || 0);
             const recruitCount = (p.breakdown['👥招募']?.count || 0) + (p.breakdown['🌟新夥伴招募']?.count || 0);
             t.totalRecruit += recruitCount;
-            t.xpBreakdown.retail   += (p.breakdown['💰零售100BV']?.total || 0);
+            t.xpBreakdown.retail   += (p.breakdown['💰零售']?.total || 0);
             t.xpBreakdown.activity += (p.breakdown['🎪商展']?.total || 0) + (p.breakdown['📢講座']?.total || 0) + (p.breakdown['🤝諮詢']?.total || 0);
             t.xpBreakdown.recruit  += recruitXP;
             t.activeCount++;
@@ -722,16 +730,10 @@ function chip(txt) { return `<span class="xp-chip">${txt}</span>`; }
 // ── Personal view ──
 function renderPersonal({ persons }) {
     const rows = persons.map((p, i) => {
-        // 計算 BV 換算成 XP（每 100BV = 10XP）
-        const bvToXp = Math.floor(p.bv / 100) * 10;
-        
         const chips = Object.entries(p.breakdown)
             .filter(([,v]) => v.total > 0)
             .map(([label, v]) => chip(`${label} ${v.total}`))
             .join('');
-        
-        // 將 BV 換算的 XP 加入明細
-        const chipsWithBv = chips + (bvToXp > 0 ? chip(`💰零售 ${bvToXp}`) : '');
 
         return `<tr class="${i<3?'rank-'+(i+1):''}">
             ${rankCell(i)}
@@ -744,7 +746,7 @@ function renderPersonal({ persons }) {
             </td>
             <td>
                 <div class="xp-total">${p.xp.toLocaleString()} XP</div>
-                <div class="xp-breakdown">${chipsWithBv}</div>
+                <div class="xp-breakdown">${chips}</div>
             </td>
             <td>
                 ${badge(p.level)}
@@ -775,15 +777,11 @@ function renderPersonal({ persons }) {
 function renderTeam({ teams }) {
     const rows = teams.map((t, i) => {
         const avg = t.activeCount ? Math.round(t.totalXP / t.activeCount) : 0;
-        const bvToXp = Math.floor(t.totalBV / 100) * 10;
         const chips = [
             t.xpBreakdown.retail   > 0 ? chip(`💰零售 ${t.xpBreakdown.retail}`) : '',
             t.xpBreakdown.activity > 0 ? chip(`🎯活動 ${t.xpBreakdown.activity}`) : '',
             t.xpBreakdown.recruit  > 0 ? chip(`👥招募 ${t.xpBreakdown.recruit}`) : '',
         ].join('');
-        
-        // 將 BV 換算的 XP 加入明細
-        const chipsWithBv = chips + (bvToXp > 0 ? chip(`💰零售 ${bvToXp}`) : '');
 
         return `<tr class="${i<3?'rank-'+(i+1):''}">
             ${rankCell(i)}
@@ -797,7 +795,7 @@ function renderTeam({ teams }) {
             </td>
             <td>
                 <div class="xp-total">${t.totalXP.toLocaleString()} XP</div>
-                <div class="xp-breakdown">${chipsWithBv}</div>
+                <div class="xp-breakdown">${chips}</div>
             </td>
             <td class="xp-total">${avg.toLocaleString()}</td>
         </tr>`;
