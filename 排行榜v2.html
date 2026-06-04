@@ -647,19 +647,27 @@ function buildPeriod(rows) {
 }
 
 function findTeam(name, teamHint) {
+    // 第一優先：完全匹配
     for (const [tname, members] of Object.entries(TEAMS)) {
-        if (members.some(m =>
-            m.toLowerCase() === name.toLowerCase() ||
-            name.includes(m) || m.includes(name)
-        )) return tname;
+        if (members.some(m => m === name)) return tname;
     }
-    // Fallback: use the teamSelect column value
+
+    // 第二優先：不區分大小寫的完全匹配
+    const nameLower = name.toLowerCase();
+    for (const [tname, members] of Object.entries(TEAMS)) {
+        if (members.some(m => m.toLowerCase() === nameLower)) return tname;
+    }
+
+    // 第三優先：如果有 teamHint，試著用它來確認
     if (teamHint) {
+        teamHint = teamHint.trim();
+        // 尋找精確的戰隊名稱匹配
         for (const tname of Object.keys(TEAMS)) {
-            if (tname === teamHint || tname.includes(teamHint) || teamHint.includes(tname)) return tname;
+            if (tname === teamHint) return tname;
         }
-        return teamHint;
     }
+
+    // 找不到就返回「未分組」
     return '未分組';
 }
 
