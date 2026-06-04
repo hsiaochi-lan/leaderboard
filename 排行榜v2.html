@@ -783,8 +783,14 @@ function renderPersonal({ persons }) {
 
 // ── Team view ──
 function renderTeam({ teams }) {
-    const rows = teams.map((t, i) => {
-        const avg = t.activeCount ? Math.round(t.totalXP / t.activeCount) : 0;
+    // 計算人均 XP（使用戰隊總人數）
+    const calcTeamAvgXP = (t) => parseFloat((t.totalXP / (t.members.length || 1)).toFixed(2));
+    
+    // 按人均 XP 排序
+    const sortedTeams = [...teams].sort((a, b) => calcTeamAvgXP(b) - calcTeamAvgXP(a));
+    
+    const rows = sortedTeams.map((t, i) => {
+        const avgXP = calcTeamAvgXP(t);
         const chips = [
             t.xpBreakdown.retail   > 0 ? chip(`💰零售 ${t.xpBreakdown.retail}`) : '',
             t.xpBreakdown.activity > 0 ? chip(`🎯活動 ${t.xpBreakdown.activity}`) : '',
@@ -805,7 +811,7 @@ function renderTeam({ teams }) {
                 <div class="xp-total">${t.totalXP.toLocaleString()} XP</div>
                 <div class="xp-breakdown">${chips}</div>
             </td>
-            <td class="xp-total">${avg.toLocaleString()}</td>
+            <td class="xp-total">${avgXP.toLocaleString()}</td>
         </tr>`;
     }).join('');
 
@@ -819,7 +825,7 @@ function renderTeam({ teams }) {
                     <th style="width:95px">參與人數</th>
                     <th style="width:110px">總 BV</th>
                     <th>總積分 XP（各項明細）</th>
-                    <th style="width:95px">平均 XP</th>
+                    <th style="width:95px">人均 XP</th>
                 </tr></thead>
                 <tbody>
                     ${teams.length ? rows : '<tr><td colspan="6" class="no-data">此期間尚無資料</td></tr>'}
@@ -839,46 +845,55 @@ function renderAwards({ teams }) {
         return;
     }
 
-    const byXP      = [...teams].sort((a,b) => b.totalXP - a.totalXP);
-    const byBV      = [...teams].sort((a,b) => b.totalBV - a.totalBV);
-    const byRecruit = [...teams].sort((a,b) => b.totalRecruit - a.totalRecruit);
+    // 計算人均 XP（保留小數點後 2 位，使用戰隊總人數）
+    const calcAvgXP = (t) => parseFloat((t.totalXP / (t.members.length || 1)).toFixed(2));
+    
+    // 計算人均 BV（保留小數點後 2 位，使用戰隊總人數）
+    const calcAvgBV = (t) => parseFloat((t.totalBV / (t.members.length || 1)).toFixed(2));
 
-    const strongest   = byXP[0];
-    const retailKing  = byBV[0];
-    const recruitKing = byRecruit[0];
+    // 計算人均招募（保留小數點後 2 位，使用戰隊總人數）
+    const calcAvgRecruit = (t) => parseFloat((t.totalRecruit / (t.members.length || 1)).toFixed(2));
+
+    const byAvgXP   = [...teams].sort((a,b) => calcAvgXP(b) - calcAvgXP(a));
+    const byAvgBV   = [...teams].sort((a,b) => calcAvgBV(b) - calcAvgBV(a));  // 改為人均 BV
+    const byRecruit = [...teams].sort((a,b) => calcAvgRecruit(b) - calcAvgRecruit(a));  // 改為人均招募
+
+    const strongest   = byAvgXP[0];   // 人均 XP 最高
+    const retailKing  = byAvgBV[0];   // 改為人均 BV 最高
+    const recruitKing = byRecruit[0]; // 改為人均招募最多
 
     const rankIcons = ['🥇','🥈','🥉'];
     const top3Rows = [0,1,2].map(i => `
         <tr class="${i<3?'rank-'+(i+1):''}">
             <td><span class="rank-icon">${rankIcons[i]}</span></td>
-            <td>${byXP[i]?.totalXP ? `<strong>${byXP[i].name}</strong> <span style="color:#888;font-size:12px">(${byXP[i].totalXP.toLocaleString()} XP)</span>` : '-'}</td>
-            <td>${byBV[i]?.totalBV ? `<strong>${byBV[i].name}</strong> <span style="color:#888;font-size:12px">(${byBV[i].totalBV.toLocaleString()} BV)</span>` : '-'}</td>
-            <td>${byRecruit[i]?.totalRecruit ? `<strong>${byRecruit[i].name}</strong> <span style="color:#888;font-size:12px">(${byRecruit[i].totalRecruit} 人)</span>` : '-'}</td>
+            <td>${byAvgXP[i]?.totalXP ? `<strong>${byAvgXP[i].name}</strong> <span style="color:#888;font-size:12px">(${calcAvgXP(byAvgXP[i]).toLocaleString()} XP/人)</span>` : '-'}</td>
+            <td>${byAvgBV[i]?.totalBV ? `<strong>${byAvgBV[i].name}</strong> <span style="color:#888;font-size:12px">(${calcAvgBV(byAvgBV[i]).toLocaleString()} BV/人)</span>` : '-'}</td>
+            <td>${byRecruit[i]?.totalRecruit ? `<strong>${byRecruit[i].name}</strong> <span style="color:#888;font-size:12px">(${calcAvgRecruit(byRecruit[i]).toLocaleString()} 人)</span>` : '-'}</td>
         </tr>`).join('');
 
     document.getElementById('content').innerHTML = `
         <div class="section-title">⭐ ${period} 月份獎項</div>
         <div class="awards-grid">
-            ${awardCard('🏆 最強戰隊','linear-gradient(135deg,#FFD700,#FFA500)', strongest, '🎮 XP 最高戰隊',
-                `<p class="award-stat">📊 總積分：<strong>${strongest.totalXP.toLocaleString()} XP</strong></p>
-                 <p class="award-stat">📈 平均積分：<strong>${Math.round(strongest.totalXP/(strongest.activeCount||1)).toLocaleString()} XP</strong></p>
-                 <p class="award-stat">👥 參與人數：<strong>${strongest.activeCount}</strong></p>`)}
-            ${awardCard('💰 零售王戰隊','linear-gradient(135deg,#43A047,#1B5E20)', retailKing, '💼 零售 BV 最高戰隊',
-                `<p class="award-stat">💵 總零售 BV：<strong>${retailKing.totalBV.toLocaleString()}</strong></p>
-                 <p class="award-stat">💰 零售 XP：<strong>${retailKing.xpBreakdown.retail.toLocaleString()} XP</strong></p>
-                 <p class="award-stat">👥 參與人數：<strong>${retailKing.activeCount}</strong></p>`)}
-            ${awardCard('👥 招募王戰隊','linear-gradient(135deg,#9C27B0,#4A148C)', recruitKing, '🤝 招募人數最多戰隊',
-                `<p class="award-stat">👫 總招募人數：<strong>${recruitKing.totalRecruit} 人</strong></p>
-                 <p class="award-stat">💫 招募 XP：<strong>${recruitKing.xpBreakdown.recruit.toLocaleString()} XP</strong></p>
-                 <p class="award-stat">👥 參與人數：<strong>${recruitKing.activeCount}</strong></p>`)}
+            ${awardCard('🏆 最強戰隊','linear-gradient(135deg,#FFD700,#FFA500)', strongest, '⭐ 人均 XP 最高戰隊',
+                `<p class="award-stat">📊 人均積分：<strong>${calcAvgXP(strongest).toLocaleString()} XP/人</strong></p>
+                 <p class="award-stat">📈 總積分：<strong>${strongest.totalXP.toLocaleString()} XP</strong></p>
+                 <p class="award-stat">👥 戰隊人數：<strong>${strongest.members.length}</strong></p>`)}
+            ${awardCard('💰 零售王戰隊','linear-gradient(135deg,#43A047,#1B5E20)', retailKing, '💼 人均零售 BV 最高戰隊',
+                `<p class="award-stat">💵 人均零售 BV：<strong>${calcAvgBV(retailKing).toLocaleString()} BV/人</strong></p>
+                 <p class="award-stat">📦 總零售 BV：<strong>${retailKing.totalBV.toLocaleString()} BV</strong></p>
+                 <p class="award-stat">👥 戰隊人數：<strong>${retailKing.members.length}</strong></p>`)}
+            ${awardCard('👥 招募王戰隊','linear-gradient(135deg,#9C27B0,#4A148C)', recruitKing, '🤝 人均招募最多戰隊',
+                `<p class="award-stat">👫 人均招募人數：<strong>${calcAvgRecruit(recruitKing).toLocaleString()} 人/人</strong></p>
+                 <p class="award-stat">� 總招募人數：<strong>${recruitKing.totalRecruit} 人</strong></p>
+                 <p class="award-stat">👥 戰隊人數：<strong>${recruitKing.members.length}</strong></p>`)}
         </div>
         <div class="section-title">📊 各項目前三名對照</div>
         <div class="table-wrapper">
             <table>
                 <thead><tr>
                     <th style="width:55px">排名</th>
-                    <th>🏆 最強戰隊（XP 最高）</th>
-                    <th>💰 零售王（BV 最高）</th>
+                    <th>🏆 最強戰隊（人均 XP 最高）</th>
+                    <th>💰 零售王（人均 BV 最高）</th>
                     <th>👥 招募王（招募最多）</th>
                 </tr></thead>
                 <tbody>${top3Rows}</tbody>
