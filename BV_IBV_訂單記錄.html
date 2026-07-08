@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BV / IBV 訂單記錄</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --gold:#C47F00;--gold-light:#FFF8E6;--gold-mid:#FFD466;--gold-dark:#7A4F00;
+  --purple:#5B47CC;--purple-light:#EEEDFE;--purple-mid:#9B8EF0;--purple-dark:#2E2580;
+  --green:#0F6E56;--green-light:#E1F5EE;--red:#C0392B;
+  --gray-bg:#F5F4F0;--gray-border:#E0DDD5;--gray-text:#8C8A82;
+  --text:#1C1B18;--white:#FFFFFF;
+  --radius:12px;--radius-sm:8px;--radius-xs:5px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Arial','PingFang TC','Microsoft JhengHei',sans-serif;font-size:14px;background:var(--gray-bg);color:var(--text);min-height:100vh}
+
+/* ── Login ── */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{background:var(--white);border:1.5px solid var(--gray-border);border-radius:var(--radius);padding:32px;max-width:340px;width:100%;text-align:center}
+.login-icons{font-size:40px;margin-bottom:12px}
+.login-title{font-size:18px;font-weight:800;margin-bottom:6px}
+.login-sub{font-size:13px;color:var(--gray-text);margin-bottom:24px;line-height:1.6}
+.login-fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;text-align:left}
+.login-fg label{font-size:11px;font-weight:700;color:var(--gray-text)}
+.login-fg input{font-size:14px;padding:10px 12px;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:#FAFAF7;color:var(--text);width:100%}
+.login-fg input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(91,71,204,.1)}
+.btn-login{width:100%;padding:11px;font-size:14px;font-weight:800;background:linear-gradient(135deg,#FFD466,#E8970A);color:#5A3600;border:none;border-radius:var(--radius-xs);cursor:pointer}
+.btn-login:hover{opacity:.9}
+.login-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
+
+/* ── Topbar ── */
+.topbar{background:var(--white);border-bottom:1px solid var(--gray-border);padding:0 24px;display:flex;align-items:center;gap:14px;height:58px;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-icon.bv{background:linear-gradient(135deg,#FFD466,#F4A800)}
+.logo-icon.ibv{background:linear-gradient(135deg,#9B8EF0,#5B47CC)}
+.logo-text{font-size:16px;font-weight:800;letter-spacing:-.4px}
+.logo-bv{color:var(--gold)}.logo-ibv{color:var(--purple)}
+.logo-slash{color:var(--gray-border);font-weight:400;margin:0 4px}
+.topbar-user{font-size:12px;color:var(--gray-text);display:flex;align-items:center;gap:6px}
+.topbar-user .uname{font-weight:700;color:var(--text)}
+.topbar-actions{margin-left:auto;display:flex;gap:8px}
+.btn-exp{display:flex;align-items:center;gap:5px;padding:7px 13px;font-size:12px;font-weight:700;border-radius:var(--radius-xs);cursor:pointer;border:none;transition:transform .1s,opacity .15s}
+.btn-exp:hover{opacity:.88;transform:translateY(-1px)}
+.btn-exp-bv{background:linear-gradient(135deg,#FFD466,#E8970A);color:#5A3600}
+.btn-exp-ibv{background:linear-gradient(135deg,#9B8EF0,#5B47CC);color:#fff}
+.btn-exp-all{background:var(--text);color:#fff}
+.btn-logout{font-size:12px;padding:5px 10px;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:none;color:var(--gray-text);cursor:pointer}
+.btn-logout:hover{background:var(--gray-bg)}
+
+/* ── Export Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--white);border-radius:var(--radius);padding:28px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.modal-title{font-size:15px;font-weight:800;margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--gray-text);margin-bottom:20px}
+.modal-row{display:flex;gap:10px;margin-bottom:12px}
+.modal-fg{display:flex;flex-direction:column;gap:4px;flex:1}
+.modal-fg label{font-size:11px;font-weight:700;color:var(--gray-text)}
+.modal-fg input{font-size:13px;padding:8px 10px;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:#FAFAF7;color:var(--text);width:100%}
+.modal-fg input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(91,71,204,.1)}
+.modal-type{display:flex;gap:8px;margin-bottom:20px}
+.modal-type-btn{flex:1;padding:8px;font-size:12px;font-weight:700;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:none;cursor:pointer;color:var(--gray-text);transition:all .15s}
+.modal-type-btn.sel-bv{background:linear-gradient(135deg,#FFD466,#E8970A);color:#5A3600;border-color:#E8970A}
+.modal-type-btn.sel-ibv{background:linear-gradient(135deg,#9B8EF0,#5B47CC);color:#fff;border-color:#5B47CC}
+.modal-type-btn.sel-all{background:var(--text);color:#fff;border-color:var(--text)}
+.modal-actions{display:flex;gap:10px;margin-top:4px}
+.btn-modal-cancel{flex:1;padding:9px;font-size:13px;font-weight:700;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:none;color:var(--gray-text);cursor:pointer}
+.btn-modal-export{flex:2;padding:9px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#7B6EE0,#5B47CC);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer}
+.btn-modal-export:hover{opacity:.9}
+
+/* ── Layout ── */
+.wrap{max-width:980px;margin:0 auto;padding:24px 20px 60px}
+.app-hidden{display:none}
+
+/* ── Hero ── */
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:26px}
+.hero-card{border-radius:var(--radius);padding:20px 22px;position:relative;overflow:hidden}
+.hero-card.bv{background:linear-gradient(135deg,#FFF3C4 0%,#FFE58A 50%,#FDD03A 100%);border:1.5px solid #F4C010}
+.hero-card.ibv{background:linear-gradient(135deg,#EAE7FF 0%,#C8C2F7 50%,#9B8EF0 100%);border:1.5px solid #8B7EE8}
+.hero-deco{position:absolute;right:-8px;top:-8px;font-size:72px;opacity:.18;line-height:1;pointer-events:none;user-select:none}
+.hero-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.hero-label.bv{color:var(--gold-dark)}.hero-label.ibv{color:var(--purple-dark)}
+.hero-row{display:flex}
+.hero-seg{flex:1}
+.hero-seg+.hero-seg{border-left:1px solid rgba(0,0,0,.08);padding-left:16px;margin-left:16px}
+.hero-seg-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin-bottom:6px}
+.hero-stats{display:flex;gap:18px;flex-wrap:wrap}
+.hero-stat-label{font-size:11px;opacity:.65;margin-bottom:2px}
+.hero-stat-val{font-size:22px;font-weight:800;letter-spacing:-.6px;line-height:1.1}
+.hero-stat-val.bv{color:var(--gold-dark)}.hero-stat-val.ibv{color:var(--purple-dark)}
+.hero-stat-val.sub{font-size:14px;color:var(--gold);margin-top:3px}
+.hero-stat-val.sub-ibv{font-size:14px;color:var(--purple);margin-top:3px}
+
+/* ── Season strip ── */
+.season-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.season-card{border-radius:var(--radius-sm);padding:12px 14px;border:1.5px solid transparent}
+.season-card.bv{background:#FFFBEE;border-color:#F4C010}
+.season-card.ibv{background:#F3F1FF;border-color:#C0B8F5}
+.season-card.current-q.bv{background:linear-gradient(135deg,#FFF3C4,#FFE58A);border-color:var(--gold)}
+.season-card.current-q.ibv{background:linear-gradient(135deg,#EAE7FF,#C8C2F7);border-color:var(--purple)}
+.season-q-badge{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;margin-bottom:6px}
+.season-q-badge.bv{background:var(--gold-mid);color:var(--gold-dark)}
+.season-q-badge.ibv{background:var(--purple-mid);color:#fff}
+.season-main{font-size:20px;font-weight:800;letter-spacing:-.4px;line-height:1.1}
+.season-main.bv{color:var(--gold-dark)}.season-main.ibv{color:var(--purple-dark)}
+.season-sub{font-size:11px;margin-top:4px;opacity:.65}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--gray-border)}
+.tab-btn{display:flex;align-items:center;gap:8px;padding:11px 22px;font-size:13px;font-weight:700;background:none;border:none;cursor:pointer;color:var(--gray-text);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;border-radius:var(--radius-sm) var(--radius-sm) 0 0}
+.tab-btn:hover{background:var(--gray-bg)}
+.tab-btn.act-bv{color:var(--gold-dark);border-bottom-color:var(--gold)}
+.tab-btn.act-ibv{color:var(--purple);border-bottom-color:var(--purple)}
+
+/* ── Panel ── */
+.panel{background:var(--white);border:1px solid var(--gray-border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:26px;margin-bottom:24px}
+.panel-hidden{display:none}
+.section-head{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px dashed var(--gray-border)}
+.section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.section-icon.bv{background:var(--gold-light)}.section-icon.ibv{background:var(--purple-light)}
+.section-title{font-size:13px;font-weight:700}.section-sub{font-size:11px;color:var(--gray-text);margin-top:1px}
+.section-divider{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gray-text);margin:24px 0 14px;display:flex;align-items:center;gap:8px}
+.section-divider::after{content:'';flex:1;height:1px;background:var(--gray-border)}
+
+/* ── Form ── */
+.form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));margin-bottom:12px}
+.form-full{grid-template-columns:1fr}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:11px;font-weight:700;color:var(--gray-text);letter-spacing:.02em}
+.fg input,.fg textarea{font-size:13px;padding:9px 11px;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:#FAFAF7;color:var(--text);width:100%;transition:border-color .15s,box-shadow .15s}
+.fg input:focus,.fg textarea:focus{outline:none;border-color:var(--purple);background:var(--white);box-shadow:0 0 0 3px rgba(91,71,204,.1)}
+.fg input[readonly]{background:#F0EFEB;color:var(--gray-text);cursor:default}
+.fg textarea{resize:vertical;min-height:52px;line-height:1.5}
+.calc-preview{display:none;align-items:center;gap:6px;background:var(--purple-light);border:1px solid #C8C2F7;border-radius:var(--radius-xs);padding:9px 14px;font-size:12px;color:var(--purple-dark);margin-bottom:12px;font-weight:600;flex-wrap:wrap}
+.calc-preview .sep{color:#A89EE8;font-weight:400}
+.btn-add{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 22px;font-size:13px;font-weight:800;border-radius:var(--radius-xs);cursor:pointer;border:none;transition:transform .1s,opacity .15s}
+.btn-add:hover{opacity:.88;transform:translateY(-1px)}
+.btn-add.bv{background:linear-gradient(135deg,#FFD466,#E8970A);color:#5A3600}
+.btn-add.ibv{background:linear-gradient(135deg,#7B6EE0,#5B47CC);color:#fff}
+
+/* ── Filter ── */
+.filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.filter-bar label{font-size:12px;color:var(--gray-text);font-weight:700}
+.filter-bar select{font-size:13px;padding:6px 10px;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:#FAFAF7;color:var(--text)}
+.btn-clear{font-size:12px;padding:5px 10px;border:1.5px solid var(--gray-border);border-radius:var(--radius-xs);background:none;color:var(--gray-text);cursor:pointer}
+.btn-clear:hover{background:var(--gray-bg)}
+.filter-count{font-size:12px;color:var(--gray-text);margin-left:auto}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;border:1.5px solid var(--gray-border);border-radius:var(--radius)}
+table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+th{padding:10px 13px;text-align:left;font-size:11px;font-weight:700;color:var(--gray-text);letter-spacing:.06em;border-bottom:1.5px solid var(--gray-border);background:#FAFAF7}
+th.num,td.num{text-align:right}
+td{padding:10px 13px;border-bottom:1px solid var(--gray-border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FFFDF5}
+.td-month{color:var(--gray-text);font-size:11px}
+.td-q{font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:4px}
+.td-q.bv{background:var(--gold-mid);color:var(--gold-dark)}
+.td-q.ibv{background:var(--purple-mid);color:#fff}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
+.pill-bv{background:var(--gold-light);color:var(--gold-dark);border:1px solid #F4C010}
+.pill-ibv{background:var(--purple-light);color:var(--purple-dark);border:1px solid #C0B8F5}
+.pill-recorder{background:#F1EFE8;color:#444;border:1px solid #D8D6CE;font-size:10px}
+.pill-bv-val{color:var(--gold);font-weight:800;font-variant-numeric:tabular-nums}
+.pill-ibv-val{color:var(--purple);font-weight:800;font-variant-numeric:tabular-nums}
+.pct-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.pct-hi{background:var(--purple-light);color:var(--purple-dark)}
+.pct-mid{background:var(--green-light);color:var(--green)}
+.pct-lo{background:#FFF3C4;color:var(--gold-dark)}
+.td-note{color:var(--gray-text);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-del{background:none;border:none;color:var(--gray-text);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:4px}
+.btn-del:hover{color:var(--red);background:#FFF0EE}
+.empty-row td{text-align:center;color:var(--gray-text);padding:36px;font-size:13px}
+.empty-icon{font-size:28px;display:block;margin-bottom:6px;opacity:.5}
+.btn-toggle{display:flex;align-items:center;justify-content:center;width:100%;padding:9px;font-size:12px;font-weight:700;border:1.5px dashed var(--gray-border);border-radius:var(--radius-xs);background:none;color:var(--gray-text);cursor:pointer;margin-top:8px;transition:background .15s}
+.btn-toggle:hover{background:var(--gray-bg);color:var(--text)}
+.tbl-toggle-wrap{display:none}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:9999;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:680px){
+  .hero{grid-template-columns:1fr}
+  .season-strip{grid-template-columns:repeat(2,1fr)}
+  .btn-exp span{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- Login -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-icons">🏅👑</div>
+    <div class="login-title">BV / IBV 訂單記錄</div>
+    <div class="login-sub">輸入你的名字開始記錄<br>每次開啟會記住上次的名字</div>
+    <div class="login-fg">
+      <label>你的名字</label>
+      <input type="text" id="login-name" placeholder="例：小明" maxlength="20"
+        onkeydown="if(event.key==='Enter')loginUser()"/>
+    </div>
+    <div class="login-err" id="login-err">請輸入名字</div>
+    <button class="btn-login" onclick="loginUser()">🏅 開始記錄</button>
+  </div>
+</div>
+
+<!-- Main app -->
+<div class="app-hidden" id="main-app">
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon bv">🏅</div>
+      <div class="logo-text"><span class="logo-bv">BV</span><span class="logo-slash">/</span><span class="logo-ibv">IBV</span></div>
+      <div class="logo-icon ibv">👑</div>
+    </div>
+    <div class="topbar-user">
+      <span id="topbar-name" class="uname"></span>
+      <span style="font-size:11px">的記錄</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-exp btn-exp-all" onclick="openExportModal()">⬇ <span>匯出</span></button>
+      <button class="btn-logout" onclick="logout()">登出</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-card bv">
+        <div class="hero-deco">🏅</div>
+        <div class="hero-label bv"><span>🏅</span> BV 統計</div>
+        <div class="hero-row">
+          <div class="hero-seg">
+            <div class="hero-seg-title" id="bv-month-label"></div>
+            <div class="hero-stats">
+              <div><div class="hero-stat-label">當月 BV</div><div class="hero-stat-val bv" id="bv-month-total">0</div></div>
+              <div><div class="hero-stat-label">售出金額</div><div class="hero-stat-val sub" id="bv-month-amt">$0</div></div>
+            </div>
+          </div>
+          <div class="hero-seg">
+            <div class="hero-seg-title" id="bv-q-label"></div>
+            <div class="hero-stats">
+              <div><div class="hero-stat-label">季度 BV</div><div class="hero-stat-val bv" id="bv-q-total">0</div></div>
+              <div><div class="hero-stat-label">售出金額</div><div class="hero-stat-val sub" id="bv-q-amt">$0</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-card ibv">
+        <div class="hero-deco">👑</div>
+        <div class="hero-label ibv"><span>👑</span> IBV 統計</div>
+        <div class="hero-row">
+          <div class="hero-seg">
+            <div class="hero-seg-title" id="ibv-month-label"></div>
+            <div class="hero-stats">
+              <div><div class="hero-stat-label">當月 IBV</div><div class="hero-stat-val ibv" id="ibv-month-total">0</div></div>
+              <div><div class="hero-stat-label">金額</div><div class="hero-stat-val sub-ibv" id="ibv-month-amt">$0</div></div>
+            </div>
+          </div>
+          <div class="hero-seg">
+            <div class="hero-seg-title" id="ibv-q-label"></div>
+            <div class="hero-stats">
+              <div><div class="hero-stat-label">季度 IBV</div><div class="hero-stat-val ibv" id="ibv-q-total">0</div></div>
+              <div><div class="hero-stat-label">金額</div><div class="hero-stat-val sub-ibv" id="ibv-q-amt">$0</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn act-bv" id="tab-btn-bv"  onclick="switchTab('bv')"><span style="font-size:17px">🏅</span> BV 訂單</button>
+      <button class="tab-btn"        id="tab-btn-ibv" onclick="switchTab('ibv')"><span style="font-size:17px">👑</span> IBV 訂單</button>
+    </div>
+
+    <!-- BV Panel -->
+    <div class="panel" id="panel-bv">
+      <div class="section-divider">🗓 本年度季統計</div>
+      <div class="season-strip" id="bv-season-strip"></div>
+
+      <div class="section-divider">🏅 新增訂單</div>
+      <div class="section-head">
+        <div class="section-icon bv">🏅</div>
+        <div><div class="section-title">新增 BV 訂單</div><div class="section-sub">BV 總數請手動輸入；零售利潤自動換算可手動修改</div></div>
+      </div>
+      <div class="form-grid">
+        <div class="fg"><label>購買人</label><input type="text" id="bv-buyer" placeholder="例：小明"/></div>
+        <div class="fg"><label>交易日期</label><input type="date" id="bv-date"/></div>
+        <div class="fg"><label>品項</label><input type="text" id="bv-item" placeholder="例：蛋白粉 2kg"/></div>
+        <div class="fg"><label>成本價 (TWD)</label><input type="number" id="bv-cost" placeholder="0" min="0" oninput="calcProfit()"/></div>
+        <div class="fg"><label>官網零售價 (TWD)</label><input type="number" id="bv-retail" placeholder="0" min="0"/></div>
+        <div class="fg"><label>實際售出金額 (TWD)</label><input type="number" id="bv-amount" placeholder="0" min="0" oninput="calcProfit()"/></div>
+        <div class="fg"><label>💰 零售利潤（可手動修改）</label><input type="number" id="bv-profit" placeholder="自動換算" step="0.01"/></div>
+        <div class="fg"><label>🏅 BV 總數</label><input type="number" id="bv-bv" placeholder="手動輸入" min="0" step="0.01"/></div>
+        <div class="fg"><label>記錄者</label><input type="text" id="bv-recorder" readonly/></div>
+      </div>
+      <div class="form-grid form-full">
+        <div class="fg"><label>備註（最多 200 字元）</label><textarea id="bv-note" placeholder="選填" maxlength="200"></textarea></div>
+      </div>
+      <button class="btn-add bv" onclick="addBV()"><span>🏅</span> 新增 BV 訂單</button>
+
+      <div class="section-divider">📋 訂單明細</div>
+      <div class="filter-bar">
+        <label>購買人篩選</label>
+        <select id="bv-filter" onchange="renderBV()"><option value="">全部</option></select>
+        <button class="btn-clear" onclick="clearFilter('bv')">清除</button>
+        <span class="filter-count" id="bv-count"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:90px">月份 / 季</th>
+            <th style="width:88px">購買人</th>
+            <th style="width:78px">記錄者</th>
+            <th>品項</th>
+            <th style="width:95px" class="num">成本價</th>
+            <th style="width:95px" class="num">官網零售價</th>
+            <th style="width:105px" class="num">實際售出</th>
+            <th style="width:90px"  class="num">💰 利潤</th>
+            <th style="width:80px"  class="num">🏅 BV</th>
+            <th style="width:130px">備註</th>
+            <th style="width:36px"></th>
+          </tr></thead>
+          <tbody id="bv-tbody"></tbody>
+        </table>
+      </div>
+      <div id="bv-toggle" class="tbl-toggle-wrap"></div>
+    </div>
+
+    <!-- IBV Panel -->
+    <div class="panel panel-hidden" id="panel-ibv">
+      <div class="section-divider">🗓 本年度季統計</div>
+      <div class="season-strip" id="ibv-season-strip"></div>
+
+      <div class="section-divider">👑 新增訂單</div>
+      <div class="section-head">
+        <div class="section-icon ibv">👑</div>
+        <div><div class="section-title">新增 IBV 訂單</div><div class="section-sub">IBV 點數自動換算（÷ 32 TWD/USD）</div></div>
+      </div>
+      <div class="calc-preview" id="ibv-calc-row">
+        <span id="c-twd"></span> TWD <span class="sep">÷ 32 =</span> $<span id="c-usd"></span> USD
+        <span class="sep">×</span> <span id="c-pct"></span>% <span class="sep">=</span>
+        <strong style="color:var(--purple);font-size:14px"><span id="c-pts"></span> 點</strong>
+      </div>
+      <div class="form-grid">
+        <div class="fg"><label>訂單編號</label><input type="text" id="ibv-ordernum" placeholder="例：ORD-20260701"/></div>
+        <div class="fg"><label>購買人</label><input type="text" id="ibv-buyer" placeholder="例：小明"/></div>
+        <div class="fg"><label>交易日期</label><input type="date" id="ibv-date"/></div>
+        <div class="fg"><label>品項</label><input type="text" id="ibv-item" placeholder="例：維他命 C"/></div>
+        <div class="fg"><label>訂單金額 (TWD)</label><input type="number" id="ibv-amount" placeholder="0" min="0" oninput="calcIBV()"/></div>
+        <div class="fg"><label>IBV 回饋 %</label><input type="number" id="ibv-pct" placeholder="例：10" min="0" max="100" step="0.1" oninput="calcIBV()"/></div>
+        <div class="fg"><label>👑 IBV 點數（自動換算）</label><input type="text" id="ibv-pts-disp" readonly placeholder="—"/></div>
+        <div class="fg"><label>記錄者</label><input type="text" id="ibv-recorder" readonly/></div>
+      </div>
+      <div class="form-grid form-full">
+        <div class="fg"><label>備註（最多 200 字元）</label><textarea id="ibv-note" placeholder="選填" maxlength="200"></textarea></div>
+      </div>
+      <button class="btn-add ibv" onclick="addIBV()"><span>👑</span> 新增 IBV 訂單</button>
+
+      <div class="section-divider">📋 訂單明細</div>
+      <div class="filter-bar">
+        <label>購買人篩選</label>
+        <select id="ibv-filter" onchange="renderIBV()"><option value="">全部</option></select>
+        <button class="btn-clear" onclick="clearFilter('ibv')">清除</button>
+        <span class="filter-count" id="ibv-count"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:90px">月份 / 季</th>
+            <th style="width:110px">訂單編號</th>
+            <th style="width:88px">購買人</th>
+            <th style="width:78px">記錄者</th>
+            <th>品項</th>
+            <th style="width:110px" class="num">金額 (TWD)</th>
+            <th style="width:65px"  class="num">IBV%</th>
+            <th style="width:95px"  class="num">👑 IBV 點</th>
+            <th style="width:130px">備註</th>
+            <th style="width:36px"></th>
+          </tr></thead>
+          <tbody id="ibv-tbody"></tbody>
+        </table>
+      </div>
+      <div id="ibv-toggle" class="tbl-toggle-wrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay hidden" id="export-modal" onclick="if(event.target===this)closeExportModal()">
+  <div class="modal">
+    <div class="modal-title">⬇ 匯出訂單</div>
+    <div class="modal-sub">選擇匯出範圍與類型</div>
+    <div class="modal-row">
+      <div class="modal-fg"><label>開始日期</label><input type="date" id="exp-from"/></div>
+      <div class="modal-fg"><label>結束日期</label><input type="date" id="exp-to"/></div>
+    </div>
+    <div style="font-size:11px;color:var(--gray-text);margin-bottom:14px">預設為當日，可自訂任意區間</div>
+    <div class="modal-type">
+      <button class="modal-type-btn sel-bv" id="exp-btn-bv" onclick="setExpType('bv')">🏅 BV</button>
+      <button class="modal-type-btn" id="exp-btn-ibv" onclick="setExpType('ibv')">👑 IBV</button>
+      <button class="modal-type-btn" id="exp-btn-all" onclick="setExpType('all')">全部</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeExportModal()">取消</button>
+      <button class="btn-modal-export" onclick="doExport()">⬇ 匯出 Excel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const IBV_RATE=32;
+const COLLAPSE_LIMIT=3;
+let currentUser='';
+let bvOrders=[],ibvOrders=[],nextId=1;
+let bvCollapsed=true,ibvCollapsed=true;
+
+/* ── Storage ── */
+function save(){
+  try{
+    localStorage.setItem('bv_orders',JSON.stringify(bvOrders));
+    localStorage.setItem('ibv_orders',JSON.stringify(ibvOrders));
+    localStorage.setItem('next_id',String(nextId));
+  }catch(e){}
+}
+function load(){
+  try{bvOrders=JSON.parse(localStorage.getItem('bv_orders')||'[]');}catch(e){bvOrders=[];}
+  try{ibvOrders=JSON.parse(localStorage.getItem('ibv_orders')||'[]');}catch(e){ibvOrders=[];}
+  try{nextId=parseInt(localStorage.getItem('next_id')||'1');}catch(e){nextId=1;}
+}
+
+/* ── Helpers ── */
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function monthOf(d){if(!d)return'';const p=d.split('-');return`${p[0]}/${p[1]}`;}
+function qOf(d){if(!d)return'';return'Q'+Math.ceil(parseInt(d.split('-')[1])/3);}
+function currentYM(){const n=new Date();return{y:n.getFullYear(),m:n.getMonth()+1};}
+function currentQ(){return Math.ceil(currentYM().m/3);}
+function qMonths(y,q){return[q*3-2,q*3-1,q*3].map(mm=>`${y}/${String(mm).padStart(2,'0')}`);}
+function ibvPts(amt,pct){return Math.round(amt/IBV_RATE*pct/100*100)/100;}
+function fmt(n){return Number(n).toLocaleString('zh-TW');}
+function getBuyers(orders){return[...new Set(orders.map(o=>o.buyer))].sort();}
+
+/* ── Toast ── */
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ── Login ── */
+function loginUser(){
+  const name=document.getElementById('login-name').value.trim();
+  if(!name){document.getElementById('login-err').style.display='block';return;}
+  document.getElementById('login-err').style.display='none';
+  currentUser=name;
+  localStorage.setItem('last_user',name);
+  startApp();
+}
+function logout(){
+  currentUser='';
+  document.getElementById('main-app').classList.add('app-hidden');
+  document.getElementById('login-screen').classList.remove('app-hidden');
+  document.getElementById('login-name').value='';
+}
+function startApp(){
+  document.getElementById('login-screen').classList.add('app-hidden');
+  document.getElementById('main-app').classList.remove('app-hidden');
+  document.getElementById('topbar-name').textContent=currentUser;
+  document.getElementById('bv-recorder').value=currentUser;
+  document.getElementById('ibv-recorder').value=currentUser;
+  document.getElementById('bv-date').value=todayStr();
+  document.getElementById('ibv-date').value=todayStr();
+  load();
+  renderAll();
+}
+
+/* ── Tab ── */
+function switchTab(t){
+  document.getElementById('panel-bv').classList.toggle('panel-hidden',t!=='bv');
+  document.getElementById('panel-ibv').classList.toggle('panel-hidden',t!=='ibv');
+  document.getElementById('tab-btn-bv').className='tab-btn'+(t==='bv'?' act-bv':'');
+  document.getElementById('tab-btn-ibv').className='tab-btn'+(t==='ibv'?' act-ibv':'');
+}
+
+/* ── Calc ── */
+function calcProfit(){
+  const amt=parseFloat(document.getElementById('bv-amount').value);
+  const cost=parseFloat(document.getElementById('bv-cost').value);
+  if(!isNaN(amt)&&!isNaN(cost)) document.getElementById('bv-profit').value=(amt-cost).toFixed(0);
+}
+function calcIBV(){
+  const amt=parseFloat(document.getElementById('ibv-amount').value);
+  const pct=parseFloat(document.getElementById('ibv-pct').value);
+  const row=document.getElementById('ibv-calc-row');
+  const disp=document.getElementById('ibv-pts-disp');
+  if(!isNaN(amt)&&!isNaN(pct)&&amt>0&&pct>0){
+    document.getElementById('c-twd').textContent='$'+fmt(amt);
+    document.getElementById('c-usd').textContent=(amt/IBV_RATE).toFixed(2);
+    document.getElementById('c-pct').textContent=pct;
+    document.getElementById('c-pts').textContent=ibvPts(amt,pct).toFixed(2);
+    disp.value=ibvPts(amt,pct).toFixed(2)+' 點';
+    row.style.display='flex';
+  }else{row.style.display='none';disp.value='—';}
+}
+
+/* ── Add ── */
+function addBV(){
+  const buyer=document.getElementById('bv-buyer').value.trim();
+  const date=document.getElementById('bv-date').value;
+  const item=document.getElementById('bv-item').value.trim();
+  const amount=parseFloat(document.getElementById('bv-amount').value);
+  const bv=parseFloat(document.getElementById('bv-bv').value);
+  const cost=parseFloat(document.getElementById('bv-cost').value);
+  const retail=parseFloat(document.getElementById('bv-retail').value);
+  const profit=parseFloat(document.getElementById('bv-profit').value);
+  const note=document.getElementById('bv-note').value.trim();
+  if(!buyer||!date||!item||isNaN(amount)||isNaN(bv)){showToast('⚠️ 請填寫所有必填欄位');return;}
+  bvOrders.unshift({id:nextId++,date,buyer,recorder:currentUser,item,
+    cost:isNaN(cost)?null:cost,retail:isNaN(retail)?null:retail,
+    amount,profit:isNaN(profit)?null:profit,bv,
+    quarter:qOf(date),note});
+  ['bv-buyer','bv-item','bv-cost','bv-retail','bv-amount','bv-profit','bv-bv','bv-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('bv-date').value=todayStr();
+  bvCollapsed=true;
+  save();renderAll();showToast('🏅 BV 訂單已新增！');
+}
+function addIBV(){
+  const ordernum=document.getElementById('ibv-ordernum').value.trim();
+  const buyer=document.getElementById('ibv-buyer').value.trim();
+  const date=document.getElementById('ibv-date').value;
+  const item=document.getElementById('ibv-item').value.trim();
+  const amount=parseFloat(document.getElementById('ibv-amount').value);
+  const pct=parseFloat(document.getElementById('ibv-pct').value);
+  const note=document.getElementById('ibv-note').value.trim();
+  if(!buyer||!date||!item||isNaN(amount)||isNaN(pct)){showToast('⚠️ 請填寫所有必填欄位');return;}
+  ibvOrders.unshift({id:nextId++,ordernum,date,buyer,recorder:currentUser,item,amount,pct,
+    ibv_pts:ibvPts(amount,pct),quarter:qOf(date),note});
+  ['ibv-ordernum','ibv-buyer','ibv-item','ibv-amount','ibv-pct','ibv-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ibv-date').value=todayStr();
+  document.getElementById('ibv-calc-row').style.display='none';
+  document.getElementById('ibv-pts-disp').value='—';
+  ibvCollapsed=true;
+  save();renderAll();showToast('👑 IBV 訂單已新增！');
+}
+
+/* ── Delete ── */
+function delBV(id){if(!confirm('確定刪除？'))return;bvOrders=bvOrders.filter(o=>o.id!==id);save();renderAll();showToast('已刪除');}
+function delIBV(id){if(!confirm('確定刪除？'))return;ibvOrders=ibvOrders.filter(o=>o.id!==id);save();renderAll();showToast('已刪除');}
+
+/* ── Toggle ── */
+function toggleBV(){bvCollapsed=!bvCollapsed;renderBV();}
+function toggleIBV(){ibvCollapsed=!ibvCollapsed;renderIBV();}
+
+/* ── Filter ── */
+function rebuildFilter(type,orders){
+  const sel=document.getElementById(type+'-filter');const cur=sel.value;
+  sel.innerHTML='<option value="">全部</option>';
+  getBuyers(orders).forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;sel.appendChild(o);});
+  sel.value=cur;
+}
+function clearFilter(type){document.getElementById(type+'-filter').value='';type==='bv'?renderBV():renderIBV();}
+
+/* ── Render ── */
+function renderAll(){renderBV();renderIBV();updateBanner();renderSeasonStrips();}
+
+function updateBanner(){
+  const{y,m}=currentYM();
+  const cm=`${y}/${String(m).padStart(2,'0')}`;
+  const cq=currentQ();
+  const qMs=qMonths(y,cq);
+  document.getElementById('bv-month-label').textContent=`${y}年${m}月`;
+  document.getElementById('ibv-month-label').textContent=`${y}年${m}月`;
+  document.getElementById('bv-q-label').textContent=`${y} Q${cq}`;
+  document.getElementById('ibv-q-label').textContent=`${y} Q${cq}`;
+  const bvM=bvOrders.filter(o=>monthOf(o.date)===cm);
+  document.getElementById('bv-month-total').textContent=bvM.reduce((s,o)=>s+Number(o.bv),0).toFixed(1);
+  document.getElementById('bv-month-amt').textContent='$'+fmt(bvM.reduce((s,o)=>s+Number(o.amount),0));
+  const bvQ=bvOrders.filter(o=>qMs.includes(monthOf(o.date)));
+  document.getElementById('bv-q-total').textContent=bvQ.reduce((s,o)=>s+Number(o.bv),0).toFixed(1);
+  document.getElementById('bv-q-amt').textContent='$'+fmt(bvQ.reduce((s,o)=>s+Number(o.amount),0));
+  const ibvM=ibvOrders.filter(o=>monthOf(o.date)===cm);
+  document.getElementById('ibv-month-total').textContent=ibvM.reduce((s,o)=>s+ibvPts(o.amount,o.pct),0).toFixed(2);
+  document.getElementById('ibv-month-amt').textContent='$'+fmt(ibvM.reduce((s,o)=>s+Number(o.amount),0));
+  const ibvQ=ibvOrders.filter(o=>qMs.includes(monthOf(o.date)));
+  document.getElementById('ibv-q-total').textContent=ibvQ.reduce((s,o)=>s+ibvPts(o.amount,o.pct),0).toFixed(2);
+  document.getElementById('ibv-q-amt').textContent='$'+fmt(ibvQ.reduce((s,o)=>s+Number(o.amount),0));
+}
+
+function renderSeasonStrips(){
+  const{y}=currentYM();const cq=currentQ();
+  ['bv','ibv'].forEach(type=>{
+    const orders=type==='bv'?bvOrders:ibvOrders;
+    document.getElementById(`${type}-season-strip`).innerHTML=[1,2,3,4].map(q=>{
+      const ms=qMonths(y,q);
+      const d=orders.filter(o=>ms.includes(monthOf(o.date)));
+      const val=type==='bv'?d.reduce((s,o)=>s+Number(o.bv),0).toFixed(1):d.reduce((s,o)=>s+ibvPts(o.amount,o.pct),0).toFixed(2);
+      const amt=d.reduce((s,o)=>s+Number(o.amount),0);
+      const isCur=q===cq;
+      return`<div class="season-card ${type}${isCur?' current-q':''}">
+        <div><span class="season-q-badge ${type}">Q${q}</span></div>
+        <div style="font-size:10px;color:var(--gray-text);margin-bottom:6px">${q*3-2}–${q*3} 月</div>
+        <div class="season-main ${type}">${val}</div>
+        <div class="season-sub">金額 $${fmt(amt)}${isCur?' ⬅ 本季':''}</div>
+      </div>`;
+    }).join('');
+  });
+}
+
+function renderBV(){
+  rebuildFilter('bv',bvOrders);
+  const f=document.getElementById('bv-filter').value;
+  const rows=f?bvOrders.filter(o=>o.buyer===f):bvOrders;
+  const total=rows.length;
+  const needCollapse=total>COLLAPSE_LIMIT;
+  const shown=needCollapse&&bvCollapsed?rows.slice(0,COLLAPSE_LIMIT):rows;
+  document.getElementById('bv-count').textContent=total?`共 ${total} 筆`:'';
+  document.getElementById('bv-tbody').innerHTML=shown.length?shown.map(o=>{
+    const profit=o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):null);
+    const pc=profit==null?'var(--gray-text)':profit>=0?'var(--green)':'var(--red)';
+    return`<tr>
+      <td class="td-month">${monthOf(o.date)}<span class="td-q bv">${o.quarter||qOf(o.date)}</span></td>
+      <td><span class="pill pill-bv">🏅 ${o.buyer}</span></td>
+      <td><span class="pill pill-recorder">✏️ ${o.recorder||'—'}</span></td>
+      <td>${o.item}</td>
+      <td class="num" style="color:var(--gray-text)">${o.cost!=null?'$'+fmt(o.cost):'—'}</td>
+      <td class="num" style="color:var(--gray-text)">${o.retail!=null?'$'+fmt(o.retail):'—'}</td>
+      <td class="num">$${fmt(o.amount)}</td>
+      <td class="num" style="color:${pc};font-weight:700">${profit!=null?(profit>=0?'+':'')+fmt(profit):'—'}</td>
+      <td class="num pill-bv-val">${Number(o.bv).toFixed(1)}</td>
+      <td class="td-note" title="${o.note||''}">${o.note||'—'}</td>
+      <td><button class="btn-del" onclick="delBV(${o.id})">×</button></td>
+    </tr>`;}).join(''):
+    `<tr class="empty-row"><td colspan="11"><span class="empty-icon">🏅</span>尚無 BV 訂單</td></tr>`;
+  const tog=document.getElementById('bv-toggle');
+  if(needCollapse){
+    tog.style.display='block';
+    tog.innerHTML=bvCollapsed
+      ?`<button class="btn-toggle" onclick="toggleBV()">▼ 顯示全部 ${total} 筆</button>`
+      :`<button class="btn-toggle" onclick="toggleBV()">▲ 收合（只顯示最新 ${COLLAPSE_LIMIT} 筆）</button>`;
+  }else{tog.style.display='none';}
+}
+
+function renderIBV(){
+  rebuildFilter('ibv',ibvOrders);
+  const f=document.getElementById('ibv-filter').value;
+  const rows=f?ibvOrders.filter(o=>o.buyer===f):ibvOrders;
+  const total=rows.length;
+  const needCollapse=total>COLLAPSE_LIMIT;
+  const shown=needCollapse&&ibvCollapsed?rows.slice(0,COLLAPSE_LIMIT):rows;
+  document.getElementById('ibv-count').textContent=total?`共 ${total} 筆`:'';
+  document.getElementById('ibv-tbody').innerHTML=shown.length?shown.map(o=>{
+    const pts=ibvPts(o.amount,o.pct);
+    const pc=o.pct>=15?'pct-hi':o.pct>=10?'pct-mid':'pct-lo';
+    return`<tr>
+      <td class="td-month">${monthOf(o.date)}<span class="td-q ibv">${o.quarter||qOf(o.date)}</span></td>
+      <td style="font-size:11px;color:var(--gray-text)">${o.ordernum||'—'}</td>
+      <td><span class="pill pill-ibv">👑 ${o.buyer}</span></td>
+      <td><span class="pill pill-recorder">✏️ ${o.recorder||'—'}</span></td>
+      <td>${o.item}</td>
+      <td class="num">$${fmt(o.amount)}</td>
+      <td class="num"><span class="pct-badge ${pc}">${o.pct}%</span></td>
+      <td class="num pill-ibv-val">${pts.toFixed(2)}</td>
+      <td class="td-note" title="${o.note||''}">${o.note||'—'}</td>
+      <td><button class="btn-del" onclick="delIBV(${o.id})">×</button></td>
+    </tr>`;}).join(''):
+    `<tr class="empty-row"><td colspan="9"><span class="empty-icon">👑</span>尚無 IBV 訂單</td></tr>`;
+  const tog=document.getElementById('ibv-toggle');
+  if(needCollapse){
+    tog.style.display='block';
+    tog.innerHTML=ibvCollapsed
+      ?`<button class="btn-toggle" onclick="toggleIBV()">▼ 顯示全部 ${total} 筆</button>`
+      :`<button class="btn-toggle" onclick="toggleIBV()">▲ 收合（只顯示最新 ${COLLAPSE_LIMIT} 筆）</button>`;
+  }else{tog.style.display='none';}
+}
+
+/* ── Export Modal ── */
+let expType='bv';
+function openExportModal(){
+  document.getElementById('exp-from').value=todayStr();
+  document.getElementById('exp-to').value=todayStr();
+  expType='bv';
+  updateExpTypeUI();
+  document.getElementById('export-modal').classList.remove('hidden');
+}
+function closeExportModal(){document.getElementById('export-modal').classList.add('hidden');}
+function setExpType(t){expType=t;updateExpTypeUI();}
+function updateExpTypeUI(){
+  ['bv','ibv','all'].forEach(t=>{
+    const btn=document.getElementById(`exp-btn-${t}`);
+    btn.className='modal-type-btn'+(expType===t?` sel-${t}`:'');
+  });
+}
+function doExport(){
+  const from=document.getElementById('exp-from').value;
+  const to=document.getElementById('exp-to').value;
+  if(!from||!to){showToast('⚠️ 請選擇日期區間');return;}
+  if(from>to){showToast('⚠️ 開始日期不能晚於結束日期');return;}
+  exportSheet(expType,from,to);
+  closeExportModal();
+}
+
+/* ── Export ── */
+function exportSheet(type,from,to){
+  const wb=XLSX.utils.book_new();
+  const now=new Date();const y=now.getFullYear();
+  const stamp=`${from.replace(/-/g,'')}_${to.replace(/-/g,'')}`;
+  const inRange=d=>d>=from&&d<=to;
+  function qSumBV(){
+    const rows=[['','季度','月份範圍','訂單筆數','實際售出金額(TWD)','零售利潤(TWD)','BV總數']];
+    [1,2,3,4].forEach(q=>{
+      const ms=qMonths(y,q);
+      const d=bvOrders.filter(o=>ms.includes(monthOf(o.date))&&inRange(o.date));
+      const tp=d.reduce((s,o)=>{const p=o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):0);return s+p;},0);
+      rows.push(['',`${y} Q${q}`,`${q*3-2}–${q*3} 月`,d.length,d.reduce((s,o)=>s+Number(o.amount),0),tp,d.reduce((s,o)=>s+Number(o.bv),0)]);
+    });return rows;
+  }
+  function qSumIBV(){
+    const rows=[['','季度','月份範圍','訂單筆數','總金額(TWD)','IBV點數合計']];
+    [1,2,3,4].forEach(q=>{
+      const ms=qMonths(y,q);
+      const d=ibvOrders.filter(o=>ms.includes(monthOf(o.date))&&inRange(o.date));
+      rows.push(['',`${y} Q${q}`,`${q*3-2}–${q*3} 月`,d.length,d.reduce((s,o)=>s+Number(o.amount),0),Math.round(d.reduce((s,o)=>s+ibvPts(o.amount,o.pct),0)*100)/100]);
+    });return rows;
+  }
+  if(type==='bv'||type==='all'){
+    const det=[['月份','季度','購買人','記錄者','交易日期','品項','成本價(TWD)','官網零售價(TWD)','實際售出金額(TWD)','零售利潤(TWD)','BV總數','備註']];
+    bvOrders.filter(o=>inRange(o.date)).forEach(o=>{
+      const p=o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):null);
+      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.buyer,o.recorder||'',o.date,o.item,o.cost??'',o.retail??'',o.amount,p??'',o.bv,o.note||'']);
+    });
+    const ws=XLSX.utils.aoa_to_sheet([...qSumBV(),[''],['訂單明細'],...det]);
+    ws['!cols']=[{wch:2},{wch:10},{wch:10},{wch:10},{wch:14},{wch:12},{wch:22},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:32}];
+    XLSX.utils.book_append_sheet(wb,ws,'BV訂單');
+  }
+  if(type==='ibv'||type==='all'){
+    const det=[['月份','季度','訂單編號','購買人','記錄者','交易日期','品項','訂單金額(TWD)','IBV回饋%','換算USD','IBV點數','備註']];
+    ibvOrders.filter(o=>inRange(o.date)).forEach(o=>{
+      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.ordernum||'',o.buyer,o.recorder||'',o.date,o.item,o.amount,o.pct,Math.round(o.amount/IBV_RATE*100)/100,ibvPts(o.amount,o.pct),o.note||'']);
+    });
+    const ws=XLSX.utils.aoa_to_sheet([...qSumIBV(),[''],['訂單明細'],...det]);
+    ws['!cols']=[{wch:2},{wch:10},{wch:10},{wch:12},{wch:10},{wch:14},{wch:12},{wch:22},{wch:12},{wch:10},{wch:10},{wch:10},{wch:32}];
+    XLSX.utils.book_append_sheet(wb,ws,'IBV訂單');
+  }
+  const label=type==='bv'?'BV':type==='ibv'?'IBV':'BV_IBV';
+  XLSX.writeFile(wb,`${label}_訂單記錄_${currentUser}_${stamp}.xlsx`);
+}
+
+/* ── Init ── */
+const lastUser=localStorage.getItem('last_user')||'';
+if(lastUser){
+  document.getElementById('login-name').value=lastUser;
+}
+</script>
+</body>
+</html>
