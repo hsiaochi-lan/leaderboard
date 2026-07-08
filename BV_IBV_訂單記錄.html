@@ -292,6 +292,7 @@ tr:hover td{background:#FFFDF5}
         <div><div class="section-title">新增 BV 訂單</div><div class="section-sub">BV 總數請手動輸入；零售利潤自動換算可手動修改</div></div>
       </div>
       <div class="form-grid">
+        <div class="fg"><label>訂單編號</label><input type="text" id="bv-ordernum" placeholder="例：ORD-20260701"/></div>
         <div class="fg"><label>購買人</label><input type="text" id="bv-buyer" placeholder="例：小明"/></div>
         <div class="fg"><label>交易日期</label><input type="date" id="bv-date"/></div>
         <div class="fg"><label>品項</label><input type="text" id="bv-item" placeholder="例：蛋白粉 2kg"/></div>
@@ -318,6 +319,7 @@ tr:hover td{background:#FFFDF5}
         <table>
           <thead><tr>
             <th style="width:90px">月份 / 季</th>
+            <th style="width:110px">訂單編號</th>
             <th style="width:88px">購買人</th>
             <th style="width:78px">記錄者</th>
             <th>品項</th>
@@ -512,6 +514,7 @@ function calcIBV(){
 
 /* ── Add ── */
 function addBV(){
+  const ordernum=document.getElementById('bv-ordernum').value.trim();
   const buyer=document.getElementById('bv-buyer').value.trim();
   const date=document.getElementById('bv-date').value;
   const item=document.getElementById('bv-item').value.trim();
@@ -522,11 +525,11 @@ function addBV(){
   const profit=parseFloat(document.getElementById('bv-profit').value);
   const note=document.getElementById('bv-note').value.trim();
   if(!buyer||!date||!item||isNaN(amount)||isNaN(bv)){showToast('⚠️ 請填寫所有必填欄位');return;}
-  bvOrders.unshift({id:nextId++,date,buyer,recorder:currentUser,item,
+  bvOrders.unshift({id:nextId++,ordernum,date,buyer,recorder:currentUser,item,
     cost:isNaN(cost)?null:cost,retail:isNaN(retail)?null:retail,
     amount,profit:isNaN(profit)?null:profit,bv,
     quarter:qOf(date),note});
-  ['bv-buyer','bv-item','bv-cost','bv-retail','bv-amount','bv-profit','bv-bv','bv-note'].forEach(id=>document.getElementById(id).value='');
+  ['bv-ordernum','bv-buyer','bv-item','bv-cost','bv-retail','bv-amount','bv-profit','bv-bv','bv-note'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('bv-date').value=todayStr();
   bvCollapsed=true;
   save();renderAll();showToast('🏅 BV 訂單已新增！');
@@ -626,6 +629,7 @@ function renderBV(){
     const pc=profit==null?'var(--gray-text)':profit>=0?'var(--green)':'var(--red)';
     return`<tr>
       <td class="td-month">${monthOf(o.date)}<span class="td-q bv">${o.quarter||qOf(o.date)}</span></td>
+      <td style="font-size:11px;color:var(--gray-text)">${o.ordernum||'—'}</td>
       <td><span class="pill pill-bv">🏅 ${o.buyer}</span></td>
       <td><span class="pill pill-recorder">✏️ ${o.recorder||'—'}</span></td>
       <td>${o.item}</td>
@@ -730,10 +734,10 @@ function exportSheet(type,from,to){
     });return rows;
   }
   if(type==='bv'||type==='all'){
-    const det=[['月份','季度','購買人','記錄者','交易日期','品項','成本價(TWD)','官網零售價(TWD)','實際售出金額(TWD)','零售利潤(TWD)','BV總數','備註']];
+    const det=[['月份','季度','訂單編號','購買人','記錄者','交易日期','品項','成本價(TWD)','官網零售價(TWD)','實際售出金額(TWD)','零售利潤(TWD)','BV總數','備註']];
     bvOrders.filter(o=>inRange(o.date)).forEach(o=>{
       const p=o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):null);
-      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.buyer,o.recorder||'',o.date,o.item,o.cost??'',o.retail??'',o.amount,p??'',o.bv,o.note||'']);
+      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.ordernum||'',o.buyer,o.recorder||'',o.date,o.item,o.cost??'',o.retail??'',o.amount,p??'',o.bv,o.note||'']);
     });
     const ws=XLSX.utils.aoa_to_sheet([...qSumBV(),[''],['訂單明細'],...det]);
     ws['!cols']=[{wch:2},{wch:10},{wch:10},{wch:10},{wch:14},{wch:12},{wch:22},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:32}];
