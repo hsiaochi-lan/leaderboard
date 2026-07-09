@@ -242,6 +242,7 @@ tr:hover td{background:#FFFDF5}
             <div class="hero-stats">
               <div><div class="hero-stat-label">當月 BV</div><div class="hero-stat-val bv" id="bv-month-total">0</div></div>
               <div><div class="hero-stat-label">售出金額</div><div class="hero-stat-val sub" id="bv-month-amt">$0</div></div>
+              <div><div class="hero-stat-label">零售利潤</div><div class="hero-stat-val sub" id="bv-month-profit">$0</div></div>
             </div>
           </div>
           <div class="hero-seg">
@@ -249,6 +250,7 @@ tr:hover td{background:#FFFDF5}
             <div class="hero-stats">
               <div><div class="hero-stat-label">季度 BV</div><div class="hero-stat-val bv" id="bv-q-total">0</div></div>
               <div><div class="hero-stat-label">售出金額</div><div class="hero-stat-val sub" id="bv-q-amt">$0</div></div>
+              <div><div class="hero-stat-label">零售利潤</div><div class="hero-stat-val sub" id="bv-q-profit">$0</div></div>
             </div>
           </div>
         </div>
@@ -301,7 +303,6 @@ tr:hover td{background:#FFFDF5}
         <div class="fg"><label>實際售出金額 (TWD)</label><input type="number" id="bv-amount" placeholder="0" min="0" oninput="calcProfit()"/></div>
         <div class="fg"><label>💰 零售利潤（可手動修改）</label><input type="number" id="bv-profit" placeholder="自動換算" step="0.01"/></div>
         <div class="fg"><label>🏅 BV 總數</label><input type="number" id="bv-bv" placeholder="手動輸入" min="0" step="0.01"/></div>
-        <div class="fg"><label>記錄者</label><input type="text" id="bv-recorder" readonly/></div>
       </div>
       <div class="form-grid form-full">
         <div class="fg"><label>備註（最多 200 字元）</label><textarea id="bv-note" placeholder="選填" maxlength="200"></textarea></div>
@@ -321,7 +322,6 @@ tr:hover td{background:#FFFDF5}
             <th style="width:90px">月份 / 季</th>
             <th style="width:110px">訂單編號</th>
             <th style="width:88px">購買人</th>
-            <th style="width:78px">記錄者</th>
             <th>品項</th>
             <th style="width:95px" class="num">成本價</th>
             <th style="width:95px" class="num">官網零售價</th>
@@ -356,11 +356,11 @@ tr:hover td{background:#FFFDF5}
         <div class="fg"><label>訂單編號</label><input type="text" id="ibv-ordernum" placeholder="例：ORD-20260701"/></div>
         <div class="fg"><label>購買人</label><input type="text" id="ibv-buyer" placeholder="例：小明"/></div>
         <div class="fg"><label>交易日期</label><input type="date" id="ibv-date"/></div>
+        <div class="fg"><label>夥伴商店名稱</label><input type="text" id="ibv-store" placeholder="例：健康生活館"/></div>
         <div class="fg"><label>品項</label><input type="text" id="ibv-item" placeholder="例：維他命 C"/></div>
         <div class="fg"><label>訂單金額 (TWD)</label><input type="number" id="ibv-amount" placeholder="0" min="0" oninput="calcIBV()"/></div>
         <div class="fg"><label>IBV 回饋 %</label><input type="number" id="ibv-pct" placeholder="例：10" min="0" max="100" step="0.1" oninput="calcIBV()"/></div>
         <div class="fg"><label>👑 IBV 點數（自動換算）</label><input type="text" id="ibv-pts-disp" readonly placeholder="—"/></div>
-        <div class="fg"><label>記錄者</label><input type="text" id="ibv-recorder" readonly/></div>
       </div>
       <div class="form-grid form-full">
         <div class="fg"><label>備註（最多 200 字元）</label><textarea id="ibv-note" placeholder="選填" maxlength="200"></textarea></div>
@@ -380,7 +380,7 @@ tr:hover td{background:#FFFDF5}
             <th style="width:90px">月份 / 季</th>
             <th style="width:110px">訂單編號</th>
             <th style="width:88px">購買人</th>
-            <th style="width:78px">記錄者</th>
+            <th style="width:100px">夥伴商店</th>
             <th>品項</th>
             <th style="width:110px" class="num">金額 (TWD)</th>
             <th style="width:65px"  class="num">IBV%</th>
@@ -475,8 +475,6 @@ function startApp(){
   document.getElementById('login-screen').classList.add('app-hidden');
   document.getElementById('main-app').classList.remove('app-hidden');
   document.getElementById('topbar-name').textContent=currentUser;
-  document.getElementById('bv-recorder').value=currentUser;
-  document.getElementById('ibv-recorder').value=currentUser;
   document.getElementById('bv-date').value=todayStr();
   document.getElementById('ibv-date').value=todayStr();
   load();
@@ -538,14 +536,15 @@ function addIBV(){
   const ordernum=document.getElementById('ibv-ordernum').value.trim();
   const buyer=document.getElementById('ibv-buyer').value.trim();
   const date=document.getElementById('ibv-date').value;
+  const store=document.getElementById('ibv-store').value.trim();
   const item=document.getElementById('ibv-item').value.trim();
   const amount=parseFloat(document.getElementById('ibv-amount').value);
   const pct=parseFloat(document.getElementById('ibv-pct').value);
   const note=document.getElementById('ibv-note').value.trim();
   if(!buyer||!date||!item||isNaN(amount)||isNaN(pct)){showToast('⚠️ 請填寫所有必填欄位');return;}
-  ibvOrders.unshift({id:nextId++,ordernum,date,buyer,recorder:currentUser,item,amount,pct,
+  ibvOrders.unshift({id:nextId++,ordernum,date,buyer,store,item,amount,pct,
     ibv_pts:ibvPts(amount,pct),quarter:qOf(date),note});
-  ['ibv-ordernum','ibv-buyer','ibv-item','ibv-amount','ibv-pct','ibv-note'].forEach(id=>document.getElementById(id).value='');
+  ['ibv-ordernum','ibv-buyer','ibv-store','ibv-item','ibv-amount','ibv-pct','ibv-note'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ibv-date').value=todayStr();
   document.getElementById('ibv-calc-row').style.display='none';
   document.getElementById('ibv-pts-disp').value='—';
@@ -578,6 +577,7 @@ function updateBanner(){
   const cm=`${y}/${String(m).padStart(2,'0')}`;
   const cq=currentQ();
   const qMs=qMonths(y,cq);
+  const calcP=o=>{return o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):0);};
   document.getElementById('bv-month-label').textContent=`${y}年${m}月`;
   document.getElementById('ibv-month-label').textContent=`${y}年${m}月`;
   document.getElementById('bv-q-label').textContent=`${y} Q${cq}`;
@@ -585,9 +585,11 @@ function updateBanner(){
   const bvM=bvOrders.filter(o=>monthOf(o.date)===cm);
   document.getElementById('bv-month-total').textContent=bvM.reduce((s,o)=>s+Number(o.bv),0).toFixed(1);
   document.getElementById('bv-month-amt').textContent='$'+fmt(bvM.reduce((s,o)=>s+Number(o.amount),0));
+  document.getElementById('bv-month-profit').textContent='$'+fmt(bvM.reduce((s,o)=>s+calcP(o),0));
   const bvQ=bvOrders.filter(o=>qMs.includes(monthOf(o.date)));
   document.getElementById('bv-q-total').textContent=bvQ.reduce((s,o)=>s+Number(o.bv),0).toFixed(1);
   document.getElementById('bv-q-amt').textContent='$'+fmt(bvQ.reduce((s,o)=>s+Number(o.amount),0));
+  document.getElementById('bv-q-profit').textContent='$'+fmt(bvQ.reduce((s,o)=>s+calcP(o),0));
   const ibvM=ibvOrders.filter(o=>monthOf(o.date)===cm);
   document.getElementById('ibv-month-total').textContent=ibvM.reduce((s,o)=>s+ibvPts(o.amount,o.pct),0).toFixed(2);
   document.getElementById('ibv-month-amt').textContent='$'+fmt(ibvM.reduce((s,o)=>s+Number(o.amount),0));
@@ -598,6 +600,7 @@ function updateBanner(){
 
 function renderSeasonStrips(){
   const{y}=currentYM();const cq=currentQ();
+  const calcP=o=>o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):0);
   ['bv','ibv'].forEach(type=>{
     const orders=type==='bv'?bvOrders:ibvOrders;
     document.getElementById(`${type}-season-strip`).innerHTML=[1,2,3,4].map(q=>{
@@ -605,12 +608,14 @@ function renderSeasonStrips(){
       const d=orders.filter(o=>ms.includes(monthOf(o.date)));
       const val=type==='bv'?d.reduce((s,o)=>s+Number(o.bv),0).toFixed(1):d.reduce((s,o)=>s+ibvPts(o.amount,o.pct),0).toFixed(2);
       const amt=d.reduce((s,o)=>s+Number(o.amount),0);
+      const profit=type==='bv'?d.reduce((s,o)=>s+calcP(o),0):null;
       const isCur=q===cq;
       return`<div class="season-card ${type}${isCur?' current-q':''}">
         <div><span class="season-q-badge ${type}">Q${q}</span></div>
         <div style="font-size:10px;color:var(--gray-text);margin-bottom:6px">${q*3-2}–${q*3} 月</div>
         <div class="season-main ${type}">${val}</div>
         <div class="season-sub">金額 $${fmt(amt)}${isCur?' ⬅ 本季':''}</div>
+        ${type==='bv'?`<div class="season-sub">利潤 $${fmt(profit)}</div>`:''}
       </div>`;
     }).join('');
   });
@@ -631,7 +636,6 @@ function renderBV(){
       <td class="td-month">${monthOf(o.date)}<span class="td-q bv">${o.quarter||qOf(o.date)}</span></td>
       <td style="font-size:11px;color:var(--gray-text)">${o.ordernum||'—'}</td>
       <td><span class="pill pill-bv">🏅 ${o.buyer}</span></td>
-      <td><span class="pill pill-recorder">✏️ ${o.recorder||'—'}</span></td>
       <td>${o.item}</td>
       <td class="num" style="color:var(--gray-text)">${o.cost!=null?'$'+fmt(o.cost):'—'}</td>
       <td class="num" style="color:var(--gray-text)">${o.retail!=null?'$'+fmt(o.retail):'—'}</td>
@@ -666,7 +670,7 @@ function renderIBV(){
       <td class="td-month">${monthOf(o.date)}<span class="td-q ibv">${o.quarter||qOf(o.date)}</span></td>
       <td style="font-size:11px;color:var(--gray-text)">${o.ordernum||'—'}</td>
       <td><span class="pill pill-ibv">👑 ${o.buyer}</span></td>
-      <td><span class="pill pill-recorder">✏️ ${o.recorder||'—'}</span></td>
+      <td style="font-size:11px">${o.store||'—'}</td>
       <td>${o.item}</td>
       <td class="num">$${fmt(o.amount)}</td>
       <td class="num"><span class="pct-badge ${pc}">${o.pct}%</span></td>
@@ -734,19 +738,19 @@ function exportSheet(type,from,to){
     });return rows;
   }
   if(type==='bv'||type==='all'){
-    const det=[['月份','季度','訂單編號','購買人','記錄者','交易日期','品項','成本價(TWD)','官網零售價(TWD)','實際售出金額(TWD)','零售利潤(TWD)','BV總數','備註']];
+    const det=[['月份','季度','訂單編號','購買人','交易日期','品項','成本價(TWD)','官網零售價(TWD)','實際售出金額(TWD)','零售利潤(TWD)','BV總數','備註']];
     bvOrders.filter(o=>inRange(o.date)).forEach(o=>{
       const p=o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):null);
-      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.ordernum||'',o.buyer,o.recorder||'',o.date,o.item,o.cost??'',o.retail??'',o.amount,p??'',o.bv,o.note||'']);
+      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.ordernum||'',o.buyer,o.date,o.item,o.cost??'',o.retail??'',o.amount,p??'',o.bv,o.note||'']);
     });
     const ws=XLSX.utils.aoa_to_sheet([...qSumBV(),[''],['訂單明細'],...det]);
     ws['!cols']=[{wch:2},{wch:10},{wch:10},{wch:10},{wch:14},{wch:12},{wch:22},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:32}];
     XLSX.utils.book_append_sheet(wb,ws,'BV訂單');
   }
   if(type==='ibv'||type==='all'){
-    const det=[['月份','季度','訂單編號','購買人','記錄者','交易日期','品項','訂單金額(TWD)','IBV回饋%','換算USD','IBV點數','備註']];
+    const det=[['月份','季度','訂單編號','購買人','夥伴商店','交易日期','品項','訂單金額(TWD)','IBV回饋%','換算USD','IBV點數','備註']];
     ibvOrders.filter(o=>inRange(o.date)).forEach(o=>{
-      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.ordernum||'',o.buyer,o.recorder||'',o.date,o.item,o.amount,o.pct,Math.round(o.amount/IBV_RATE*100)/100,ibvPts(o.amount,o.pct),o.note||'']);
+      det.push([monthOf(o.date),o.quarter||qOf(o.date),o.ordernum||'',o.buyer,o.store||'',o.date,o.item,o.amount,o.pct,Math.round(o.amount/IBV_RATE*100)/100,ibvPts(o.amount,o.pct),o.note||'']);
     });
     const ws=XLSX.utils.aoa_to_sheet([...qSumIBV(),[''],['訂單明細'],...det]);
     ws['!cols']=[{wch:2},{wch:10},{wch:10},{wch:12},{wch:10},{wch:14},{wch:12},{wch:22},{wch:12},{wch:10},{wch:10},{wch:10},{wch:32}];
