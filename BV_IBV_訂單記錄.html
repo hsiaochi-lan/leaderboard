@@ -577,7 +577,7 @@ function updateBanner(){
   const cm=`${y}/${String(m).padStart(2,'0')}`;
   const cq=currentQ();
   const qMs=qMonths(y,cq);
-  const calcP=o=>{return o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):0);};
+  const calcP=o=>{return o.profit!==null&&o.profit!==undefined&&o.profit!==''?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):0);};
   document.getElementById('bv-month-label').textContent=`${y}年${m}月`;
   document.getElementById('ibv-month-label').textContent=`${y}年${m}月`;
   document.getElementById('bv-q-label').textContent=`${y} Q${cq}`;
@@ -600,7 +600,7 @@ function updateBanner(){
 
 function renderSeasonStrips(){
   const{y}=currentYM();const cq=currentQ();
-  const calcP=o=>o.profit!=null?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):0);
+  const calcP=o=>o.profit!==null&&o.profit!==undefined&&o.profit!==''?Number(o.profit):(o.amount!=null&&o.cost!=null?Number(o.amount)-Number(o.cost):0);
   ['bv','ibv'].forEach(type=>{
     const orders=type==='bv'?bvOrders:ibvOrders;
     document.getElementById(`${type}-season-strip`).innerHTML=[1,2,3,4].map(q=>{
